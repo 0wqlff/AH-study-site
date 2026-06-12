@@ -114,6 +114,31 @@
     .empty-state p { margin-top: 12px; font-size: 15px; }
     .config-banner { background: #fef3c7; border: 1px solid #fcd34d; border-radius: 8px; padding: 16px; margin-bottom: 20px; font-size: 14px; color: #92400e; }
     .config-banner code { background: rgba(0,0,0,.08); padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+
+    /* ── Feedback ── */
+    .feedback-form-card { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,.08); max-width: 680px; }
+    .feedback-item { background: white; border-radius: 10px; padding: 18px 20px; border: 1px solid #e5e7eb; margin-bottom: 10px; transition: border-color .2s; }
+    .feedback-item.unread { border-left: 4px solid #667eea; }
+    .feedback-item-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+    .feedback-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .feedback-badge { padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+    .badge-general   { background: #e0e7ff; color: #3730a3; }
+    .badge-lesson    { background: #dcfce7; color: #166534; }
+    .badge-homework  { background: #fef3c7; color: #92400e; }
+    .badge-technical { background: #fee2e2; color: #991b1b; }
+    .badge-other     { background: #f3f4f6; color: #374151; }
+    .feedback-date { font-size: 12px; color: #9ca3af; }
+    .feedback-author { font-size: 13px; font-weight: 600; color: #374151; }
+    .feedback-text { font-size: 14px; color: #4b5563; line-height: 1.6; white-space: pre-wrap; }
+    .feedback-actions { display: flex; gap: 8px; margin-top: 12px; }
+    .mark-read-btn { padding: 5px 12px; font-size: 12px; font-weight: 600; border: none; border-radius: 5px; cursor: pointer; background: #e0e7ff; color: #3730a3; transition: all .2s; }
+    .mark-read-btn:hover { background: #c7d2fe; }
+    .delete-feedback-btn { padding: 5px 12px; font-size: 12px; font-weight: 600; border: none; border-radius: 5px; cursor: pointer; background: #fee2e2; color: #dc2626; transition: all .2s; }
+    .delete-feedback-btn:hover { background: #fecaca; }
+    .feedback-filter-btn { padding: 7px 14px; border: 1px solid #d1d5db; border-radius: 20px; background: white; font-size: 13px; font-weight: 500; cursor: pointer; color: #4b5563; transition: all .2s; }
+    .feedback-filter-btn:hover { border-color: #667eea; color: #667eea; }
+    .feedback-filter-btn.active { background: #667eea; color: white; border-color: #667eea; }
+    .anon-tag { font-size: 12px; color: #9ca3af; font-style: italic; }
   </style>
 </head>
 <body>
@@ -124,8 +149,8 @@
      → Project Settings → API
      ══════════════════════════════════════════ -->
 <script>
-  const SUPABASE_URL = 'https://xxghzcirmkywfwmyftvw.supabase.co';       // e.g. https://xyzabc.supabase.co
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh4Z2h6Y2lybWt5d2Z3bXlmdHZ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExOTA0OTcsImV4cCI6MjA5Njc2NjQ5N30.gXOeoo9cUc5grIyztMPJI-Rbzqkuiipd1m5CyIoAFNM'; // starts with "eyJ..."
+  const SUPABASE_URL = 'YOUR_SUPABASE_URL';       // e.g. https://xyzabc.supabase.co
+  const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY'; // starts with "eyJ..."
 </script>
 
 <!-- Login Screen -->
@@ -171,12 +196,18 @@
         <button class="nav-button" id="nav-subjects" onclick="switchPage('subjects')">
           <i data-lucide="book" style="width:18px;height:18px"></i> My Subjects
         </button>
+        <button class="nav-button" id="nav-feedback" onclick="switchPage('feedback')">
+          <i data-lucide="message-square" style="width:18px;height:18px"></i> Feedback
+        </button>
         <div id="admin-nav" style="display:none">
           <button class="nav-button" id="nav-admin-subjects" onclick="switchPage('admin-subjects')">
             <i data-lucide="settings" style="width:18px;height:18px"></i> Manage Subjects
           </button>
           <button class="nav-button" id="nav-admin-users" onclick="switchPage('admin-users')">
             <i data-lucide="users" style="width:18px;height:18px"></i> Manage Users
+          </button>
+          <button class="nav-button" id="nav-admin-feedback" onclick="switchPage('admin-feedback')">
+            <i data-lucide="inbox" style="width:18px;height:18px"></i> View Feedback
           </button>
         </div>
       </div>
@@ -238,6 +269,58 @@
             <tbody id="users-tbody"></tbody>
           </table>
         </div>
+      </div>
+
+      <!-- Student Feedback -->
+      <div id="feedback-page" style="display:none">
+        <div class="feedback-form-card">
+          <h2 style="margin:0 0 6px;font-size:18px;color:#111827">Send Feedback</h2>
+          <p style="margin:0 0 20px;font-size:14px;color:#6b7280">Share thoughts, suggestions, or issues with your teacher.</p>
+          <div class="form-group">
+            <label>Category</label>
+            <select id="feedback-category">
+              <option value="general">General</option>
+              <option value="lesson">Lesson / Content</option>
+              <option value="homework">Homework</option>
+              <option value="technical">Technical Issue</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Message</label>
+            <textarea id="feedback-message" placeholder="Write your feedback here…" style="min-height:120px"></textarea>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <button class="btn btn-primary" id="submit-feedback-btn" onclick="submitFeedback()">
+              <i data-lucide="send" style="width:16px;height:16px"></i> Send feedback
+            </button>
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#6b7280;cursor:pointer;margin:0">
+              <input type="checkbox" id="feedback-anonymous"> Send anonymously
+            </label>
+          </div>
+        </div>
+
+        <div style="margin-top:28px">
+          <h3 style="font-size:16px;color:#374151;margin:0 0 14px;font-weight:600">Your previous feedback</h3>
+          <div id="feedback-history"></div>
+        </div>
+      </div>
+
+      <!-- Admin Feedback -->
+      <div id="admin-feedback-page" style="display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="feedback-filter-btn active" data-filter="all" onclick="filterAdminFeedback('all')">All</button>
+            <button class="feedback-filter-btn" data-filter="unread" onclick="filterAdminFeedback('unread')">Unread</button>
+            <button class="feedback-filter-btn" data-filter="general" onclick="filterAdminFeedback('general')">General</button>
+            <button class="feedback-filter-btn" data-filter="lesson" onclick="filterAdminFeedback('lesson')">Lesson</button>
+            <button class="feedback-filter-btn" data-filter="homework" onclick="filterAdminFeedback('homework')">Homework</button>
+            <button class="feedback-filter-btn" data-filter="technical" onclick="filterAdminFeedback('technical')">Technical</button>
+            <button class="feedback-filter-btn" data-filter="other" onclick="filterAdminFeedback('other')">Other</button>
+          </div>
+          <span id="feedback-count" style="font-size:13px;color:#6b7280"></span>
+        </div>
+        <div id="admin-feedback-list"></div>
       </div>
 
     </div>
@@ -477,9 +560,11 @@ async function enterApp() {
   if (currentType === 'admin') {
     document.getElementById('admin-nav').style.display = 'block';
     document.getElementById('student-subjects-section').style.display = 'none';
+    document.getElementById('nav-feedback').style.display = 'none';
   } else {
     document.getElementById('admin-nav').style.display = 'none';
     document.getElementById('student-subjects-section').style.display = 'block';
+    document.getElementById('nav-feedback').style.display = 'flex';
   }
 
   await loadData();
@@ -511,7 +596,7 @@ async function loadData() {
 // Page switching
 // ─────────────────────────────────────────────
 function switchPage(page) {
-  ['timetable-page','subjects-page','admin-subjects-page','admin-users-page'].forEach(id => {
+  ['timetable-page','subjects-page','admin-subjects-page','admin-users-page','feedback-page','admin-feedback-page'].forEach(id => {
     document.getElementById(id).style.display = 'none';
   });
   document.querySelectorAll('.nav-button').forEach(b => b.classList.remove('active'));
@@ -521,6 +606,8 @@ function switchPage(page) {
     'subjects':        { el: 'subjects-page',         title: 'My Subjects',       nav: 'nav-subjects' },
     'admin-subjects':  { el: 'admin-subjects-page',   title: 'Manage Subjects',   nav: 'nav-admin-subjects' },
     'admin-users':     { el: 'admin-users-page',      title: 'Manage Users',      nav: 'nav-admin-users' },
+    'feedback':        { el: 'feedback-page',         title: 'Feedback',          nav: 'nav-feedback' },
+    'admin-feedback':  { el: 'admin-feedback-page',   title: 'Student Feedback',  nav: 'nav-admin-feedback' },
   };
   const info = map[page];
   if (!info) return;
@@ -529,6 +616,10 @@ function switchPage(page) {
   const navEl = document.getElementById(info.nav);
   if (navEl) navEl.classList.add('active');
   lucide.createIcons();
+
+  // Load data when switching to feedback pages
+  if (page === 'feedback') loadFeedbackHistory();
+  if (page === 'admin-feedback') loadAdminFeedback();
 }
 
 // ─────────────────────────────────────────────
@@ -908,6 +999,176 @@ function wireStaticListeners() {
   });
 }
 
+// ─────────────────────────────────────────────
+// Feedback (student)
+// ─────────────────────────────────────────────
+let allFeedback = [];
+let feedbackFilter = 'all';
+
+async function submitFeedback() {
+  const message   = document.getElementById('feedback-message').value.trim();
+  const category  = document.getElementById('feedback-category').value;
+  const anonymous = document.getElementById('feedback-anonymous').checked;
+
+  if (!message) { toast('Please write a message before sending.', 'error'); return; }
+
+  const btn = document.getElementById('submit-feedback-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="loading-spinner"></div> Sending…';
+
+  const { error } = await db.from('feedback').insert({
+    username: anonymous ? null : currentUser,
+    category,
+    message,
+    is_anonymous: anonymous,
+    is_read: false
+  });
+
+  btn.disabled = false;
+  btn.innerHTML = '<i data-lucide="send" style="width:16px;height:16px"></i> Send feedback';
+  lucide.createIcons();
+
+  if (error) { toast('Failed to send: ' + error.message, 'error'); return; }
+
+  document.getElementById('feedback-message').value = '';
+  document.getElementById('feedback-anonymous').checked = false;
+  toast('Feedback sent!', 'success');
+  loadFeedbackHistory();
+}
+
+async function loadFeedbackHistory() {
+  const container = document.getElementById('feedback-history');
+  if (!container) return;
+  container.innerHTML = '<p style="color:#9ca3af;font-size:14px">Loading…</p>';
+
+  const { data, error } = await db.from('feedback')
+    .select('*')
+    .eq('username', currentUser)
+    .order('created_at', { ascending: false });
+
+  if (error) { container.innerHTML = '<p style="color:#dc2626;font-size:14px">Failed to load history.</p>'; return; }
+
+  if (!data.length) {
+    container.innerHTML = '<div class="empty-state" style="padding:24px"><p>No feedback sent yet.</p></div>';
+    return;
+  }
+
+  container.innerHTML = data.map(f => `
+    <div class="feedback-item">
+      <div class="feedback-item-header">
+        <div class="feedback-meta">
+          <span class="feedback-badge badge-${f.category}">${capitalize(f.category)}</span>
+          ${f.is_anonymous ? '<span class="anon-tag">Anonymous</span>' : ''}
+        </div>
+        <span class="feedback-date">${formatDate(f.created_at)}</span>
+      </div>
+      <div class="feedback-text">${escapeHtml(f.message)}</div>
+    </div>
+  `).join('');
+}
+
+// ─────────────────────────────────────────────
+// Feedback (admin)
+// ─────────────────────────────────────────────
+async function loadAdminFeedback() {
+  const container = document.getElementById('admin-feedback-list');
+  if (!container) return;
+  container.innerHTML = '<p style="color:#9ca3af;font-size:14px">Loading…</p>';
+
+  const { data, error } = await db.from('feedback')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) { container.innerHTML = '<p style="color:#dc2626;font-size:14px">Failed to load feedback.</p>'; return; }
+
+  allFeedback = data;
+  renderAdminFeedback();
+}
+
+function filterAdminFeedback(filter) {
+  feedbackFilter = filter;
+  document.querySelectorAll('.feedback-filter-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.filter === filter);
+  });
+  renderAdminFeedback();
+}
+
+function renderAdminFeedback() {
+  const container = document.getElementById('admin-feedback-list');
+  const countEl   = document.getElementById('feedback-count');
+  if (!container) return;
+
+  let items = allFeedback;
+  if (feedbackFilter === 'unread') items = items.filter(f => !f.is_read);
+  else if (feedbackFilter !== 'all') items = items.filter(f => f.category === feedbackFilter);
+
+  const unreadTotal = allFeedback.filter(f => !f.is_read).length;
+  if (countEl) countEl.textContent = `${items.length} item${items.length !== 1 ? 's' : ''}${unreadTotal ? ' · ' + unreadTotal + ' unread' : ''}`;
+
+  if (!items.length) {
+    container.innerHTML = '<div class="empty-state"><p>No feedback found.</p></div>';
+    return;
+  }
+
+  container.innerHTML = items.map(f => `
+    <div class="feedback-item ${f.is_read ? '' : 'unread'}" id="fb-${f.id}">
+      <div class="feedback-item-header">
+        <div class="feedback-meta">
+          <span class="feedback-author">${f.is_anonymous ? '👤 Anonymous' : '🎓 ' + escapeHtml(f.username || 'Unknown')}</span>
+          <span class="feedback-badge badge-${f.category}">${capitalize(f.category)}</span>
+          ${!f.is_read ? '<span class="feedback-badge" style="background:#fef3c7;color:#92400e">New</span>' : ''}
+        </div>
+        <span class="feedback-date">${formatDate(f.created_at)}</span>
+      </div>
+      <div class="feedback-text">${escapeHtml(f.message)}</div>
+      <div class="feedback-actions">
+        ${!f.is_read ? `<button class="mark-read-btn" onclick="markFeedbackRead('${f.id}')">✓ Mark as read</button>` : '<span style="font-size:12px;color:#9ca3af">✓ Read</span>'}
+        <button class="delete-feedback-btn" onclick="deleteFeedback('${f.id}')">Delete</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function markFeedbackRead(id) {
+  const { error } = await db.from('feedback').update({ is_read: true }).eq('id', id);
+  if (error) { toast('Failed to update.', 'error'); return; }
+  const item = allFeedback.find(f => f.id === id);
+  if (item) item.is_read = true;
+  renderAdminFeedback();
+}
+
+async function deleteFeedback(id) {
+  const btn = document.querySelector(`#fb-${id} .delete-feedback-btn`);
+  if (btn && btn.dataset.confirming !== 'true') {
+    btn.dataset.confirming = 'true';
+    btn.textContent = 'Confirm?';
+    setTimeout(() => { btn.dataset.confirming = 'false'; btn.textContent = 'Delete'; }, 3000);
+    return;
+  }
+  const { error } = await db.from('feedback').delete().eq('id', id);
+  if (error) { toast('Failed to delete.', 'error'); return; }
+  allFeedback = allFeedback.filter(f => f.id !== id);
+  renderAdminFeedback();
+  toast('Feedback deleted.', 'success');
+}
+
+// ─────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────
+function capitalize(str) {
+  return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
+}
+function formatDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) +
+    ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+}
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 // Expose globals needed by inline onclick handlers
 window.switchPage = switchPage;
 window.openSubjectDetail = openSubjectDetail;
@@ -918,6 +1179,10 @@ window.saveSubjectDetail = saveSubjectDetail;
 window.deleteSubject = deleteSubject;
 window.deleteAdminSubject = deleteAdminSubject;
 window.openResetModal = openResetModal;
+window.submitFeedback = submitFeedback;
+window.markFeedbackRead = markFeedbackRead;
+window.deleteFeedback = deleteFeedback;
+window.filterAdminFeedback = filterAdminFeedback;
 
 boot();
 </script>
