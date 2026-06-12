@@ -124,22 +124,24 @@
      → Project Settings → API
      ══════════════════════════════════════════ -->
 <script>
-  const SUPABASE_URL = 'https://xxghzcirmkywfwmyftvw.supabase.co';       // e.g. https://xyzabc.supabase.co
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh4Z2h6Y2lybWt5d2Z3bXlmdHZ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExOTA0OTcsImV4cCI6MjA5Njc2NjQ5N30.gXOeoo9cUc5grIyztMPJI-Rbzqkuiipd1m5CyIoAFNM'; // starts with "eyJ..."
+  const SUPABASE_URL = 'YOUR_SUPABASE_URL';       // e.g. https://xyzabc.supabase.co
+  const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY'; // starts with "eyJ..."
 </script>
 
 <!-- Login Screen -->
 <div id="login-screen" class="login-screen">
   <div class="login-card">
     <h1>📚 Study Hub</h1>
+    <div id="login-subtitle" style="text-align:center;color:#6b7280;font-size:14px;margin-bottom:20px;margin-top:-16px">Sign in to your account</div>
     <div id="login-error" class="login-error"></div>
     <div class="login-form">
       <select id="login-type">
         <option value="student">Student Login</option>
         <option value="admin">Admin Login</option>
       </select>
-      <input type="text" id="login-username" placeholder="Username">
-      <input type="password" id="login-password" placeholder="Password">
+      <input type="text" id="login-username" placeholder="Username" autocomplete="username">
+      <input type="password" id="login-password" placeholder="Password" autocomplete="current-password">
+      <input type="password" id="login-confirm-password" placeholder="Confirm password" autocomplete="new-password" style="display:none">
       <button class="login-button" id="login-btn">Login</button>
     </div>
     <div class="register-link" id="register-link-row">
@@ -411,20 +413,27 @@ async function handleLogin() {
 async function handleRegister() {
   const username = document.getElementById('login-username').value.trim();
   const password = document.getElementById('login-password').value;
+  const confirm  = document.getElementById('login-confirm-password').value;
 
-  if (!username || !password) { showLoginError('Please fill in all fields.'); return; }
-  if (username.length < 3)    { showLoginError('Username must be at least 3 characters.'); return; }
-  if (password.length < 3)    { showLoginError('Password must be at least 3 characters.'); return; }
-  if (username === 'admin')   { showLoginError('That username is reserved.'); return; }
+  if (!username || !password || !confirm) { showLoginError('Please fill in all fields.'); return; }
+  if (username.length < 3)  { showLoginError('Username must be at least 3 characters.'); return; }
+  if (!/^[a-zA-Z0-9_]+$/.test(username)) { showLoginError('Username can only contain letters, numbers, and underscores.'); return; }
+  if (password.length < 3)  { showLoginError('Password must be at least 3 characters.'); return; }
+  if (password !== confirm)  { showLoginError('Passwords do not match.'); return; }
+  if (username.toLowerCase() === 'admin') { showLoginError('That username is reserved.'); return; }
 
   const btn = document.getElementById('login-btn');
   btn.disabled = true;
-  btn.innerHTML = '<div class="loading-spinner"></div>';
+  btn.innerHTML = '<div class="loading-spinner"></div> Creating account…';
 
   try {
+    // Check if username already exists
+    const { data: existing } = await db.from('users').select('id').eq('username', username).maybeSingle();
+    if (existing) { showLoginError('Username already taken. Please choose another.'); return; }
+
     const { error } = await db.from('users').insert({ username, password, user_type: 'student' });
     if (error) {
-      if (error.code === '23505') { showLoginError('Username already taken.'); }
+      if (error.code === '23505') { showLoginError('Username already taken. Please choose another.'); }
       else { showLoginError('Registration failed: ' + error.message); }
       return;
     }
@@ -434,7 +443,7 @@ async function handleRegister() {
     await enterApp();
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Login';
+    btn.textContent = 'Create account';
   }
 }
 
@@ -828,19 +837,32 @@ function toast(msg, type = 'success') {
 let loginMode = 'login';
 function setLoginMode(mode) {
   loginMode = mode;
-  const btn = document.getElementById('login-btn');
-  const row = document.getElementById('register-link-row');
-  const typeRow = document.getElementById('login-type').parentElement;
+  const btn            = document.getElementById('login-btn');
+  const subtitle       = document.getElementById('login-subtitle');
+  const typeSelect     = document.getElementById('login-type');
+  const confirmField   = document.getElementById('login-confirm-password');
+  const passwordField  = document.getElementById('login-password');
+  const linkRow        = document.getElementById('register-link-row');
+  const errDiv         = document.getElementById('login-error');
+  errDiv.style.display = 'none';
+
   if (mode === 'register') {
     btn.textContent = 'Create account';
-    row.innerHTML = 'Already have an account? <a id="show-login">Sign in</a>';
+    subtitle.textContent = 'Create your student account';
+    typeSelect.parentElement.style.display = 'none';  // hide student/admin selector
+    confirmField.style.display = 'block';
+    passwordField.placeholder = 'Password (min 3 characters)';
+    linkRow.innerHTML = 'Already have an account? <a id="show-login" style="color:#667eea;cursor:pointer;text-decoration:underline">Sign in</a>';
     document.getElementById('show-login').addEventListener('click', () => setLoginMode('login'));
-    document.getElementById('login-type').parentElement.style.display = 'none';
   } else {
     btn.textContent = 'Login';
-    row.innerHTML = 'New student? <a id="show-register">Create an account</a>';
+    subtitle.textContent = 'Sign in to your account';
+    typeSelect.parentElement.style.display = 'block';
+    confirmField.style.display = 'none';
+    confirmField.value = '';
+    passwordField.placeholder = 'Password';
+    linkRow.innerHTML = 'New student? <a id="show-register" style="color:#667eea;cursor:pointer;text-decoration:underline">Create an account</a>';
     document.getElementById('show-register').addEventListener('click', () => setLoginMode('register'));
-    document.getElementById('login-type').parentElement.style.display = 'block';
   }
 }
 
@@ -856,6 +878,8 @@ function wireStaticListeners() {
   document.getElementById('login-password').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('login-btn').click(); });
 
   document.getElementById('show-register').addEventListener('click', () => setLoginMode('register'));
+  // confirm-password: also trigger on Enter
+  document.getElementById('login-confirm-password').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('login-btn').click(); });
   document.getElementById('logout-btn').addEventListener('click', handleLogout);
 
   document.getElementById('add-subject-btn').addEventListener('click', () => openAddModal(false));
