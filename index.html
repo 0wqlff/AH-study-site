@@ -139,6 +139,23 @@
     .feedback-filter-btn:hover { border-color: #667eea; color: #667eea; }
     .feedback-filter-btn.active { background: #667eea; color: white; border-color: #667eea; }
     .anon-tag { font-size: 12px; color: #9ca3af; font-style: italic; }
+    .admin-reply-box { margin-top: 14px; background: #f0f4ff; border-radius: 8px; padding: 14px; border-left: 3px solid #667eea; }
+    .admin-reply-box .reply-label { font-size: 12px; font-weight: 700; color: #667eea; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 6px; }
+    .admin-reply-box .reply-text { font-size: 14px; color: #374151; line-height: 1.6; white-space: pre-wrap; }
+    .reply-form { margin-top: 14px; display: none; }
+    .reply-form.open { display: block; }
+    .reply-form textarea { width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; font-family: inherit; resize: vertical; min-height: 80px; }
+    .reply-form textarea:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,.1); }
+    .reply-form-actions { display: flex; gap: 8px; margin-top: 8px; }
+    .reply-submit-btn { padding: 6px 14px; font-size: 13px; font-weight: 600; border: none; border-radius: 5px; cursor: pointer; background: #667eea; color: white; transition: all .2s; }
+    .reply-submit-btn:hover { background: #5568d3; }
+    .reply-cancel-btn { padding: 6px 14px; font-size: 13px; font-weight: 600; border: none; border-radius: 5px; cursor: pointer; background: #e5e7eb; color: #374151; transition: all .2s; }
+    .reply-cancel-btn:hover { background: #d1d5db; }
+    .reply-btn { padding: 5px 12px; font-size: 12px; font-weight: 600; border: none; border-radius: 5px; cursor: pointer; background: #e0e7ff; color: #3730a3; transition: all .2s; }
+    .reply-btn:hover { background: #c7d2fe; }
+    .student-reply-box { margin-top: 14px; background: #f0f4ff; border-radius: 8px; padding: 14px; border-left: 3px solid #667eea; }
+    .student-reply-box .reply-label { font-size: 12px; font-weight: 700; color: #667eea; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 6px; }
+    .student-reply-box .reply-text { font-size: 14px; color: #374151; line-height: 1.6; white-space: pre-wrap; }
   </style>
 </head>
 <body>
@@ -149,8 +166,8 @@
      → Project Settings → API
      ══════════════════════════════════════════ -->
 <script>
-  const SUPABASE_URL = 'https://xxghzcirmkywfwmyftvw.supabase.co';       // e.g. https://xyzabc.supabase.co
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh4Z2h6Y2lybWt5d2Z3bXlmdHZ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExOTA0OTcsImV4cCI6MjA5Njc2NjQ5N30.gXOeoo9cUc5grIyztMPJI-Rbzqkuiipd1m5CyIoAFNM'; // starts with "eyJ..."
+  const SUPABASE_URL = 'YOUR_SUPABASE_URL';       // e.g. https://xyzabc.supabase.co
+  const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY'; // starts with "eyJ..."
 </script>
 
 <!-- Login Screen -->
@@ -1063,6 +1080,12 @@ async function loadFeedbackHistory() {
         <span class="feedback-date">${formatDate(f.created_at)}</span>
       </div>
       <div class="feedback-text">${escapeHtml(f.message)}</div>
+      ${f.admin_reply ? `
+        <div class="student-reply-box">
+          <div class="reply-label">✏️ Teacher replied</div>
+          <div class="reply-text">${escapeHtml(f.admin_reply)}</div>
+        </div>
+      ` : ''}
     </div>
   `).join('');
 }
@@ -1121,12 +1144,65 @@ function renderAdminFeedback() {
         <span class="feedback-date">${formatDate(f.created_at)}</span>
       </div>
       <div class="feedback-text">${escapeHtml(f.message)}</div>
+      ${f.admin_reply ? `
+        <div class="admin-reply-box">
+          <div class="reply-label">✏️ Your reply</div>
+          <div class="reply-text">${escapeHtml(f.admin_reply)}</div>
+        </div>
+      ` : ''}
+      <div class="reply-form" id="reply-form-${f.id}">
+        <textarea id="reply-text-${f.id}" placeholder="Write a reply to this student…">${f.admin_reply ? escapeHtml(f.admin_reply) : ''}</textarea>
+        <div class="reply-form-actions">
+          <button class="reply-submit-btn" onclick="submitReply('${f.id}')">Send reply</button>
+          <button class="reply-cancel-btn" onclick="toggleReplyForm('${f.id}')">Cancel</button>
+          ${f.admin_reply ? `<button class="reply-cancel-btn" style="background:#fee2e2;color:#dc2626" onclick="deleteReply('${f.id}')">Remove reply</button>` : ''}
+        </div>
+      </div>
       <div class="feedback-actions">
         ${!f.is_read ? `<button class="mark-read-btn" onclick="markFeedbackRead('${f.id}')">✓ Mark as read</button>` : '<span style="font-size:12px;color:#9ca3af">✓ Read</span>'}
+        <button class="reply-btn" onclick="toggleReplyForm('${f.id}')">${f.admin_reply ? '✏️ Edit reply' : '💬 Reply'}</button>
         <button class="delete-feedback-btn" onclick="deleteFeedback('${f.id}')">Delete</button>
       </div>
     </div>
   `).join('');
+}
+
+function toggleReplyForm(id) {
+  const form = document.getElementById(`reply-form-${id}`);
+  if (!form) return;
+  form.classList.toggle('open');
+  if (form.classList.contains('open')) {
+    const ta = document.getElementById(`reply-text-${id}`);
+    if (ta) setTimeout(() => ta.focus(), 50);
+  }
+}
+
+async function submitReply(id) {
+  const ta = document.getElementById(`reply-text-${id}`);
+  const reply = ta ? ta.value.trim() : '';
+  if (!reply) { toast('Please write a reply first.', 'error'); return; }
+
+  const btn = document.querySelector(`#reply-form-${id} .reply-submit-btn`);
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+
+  const { error } = await db.from('feedback').update({ admin_reply: reply, is_read: true }).eq('id', id);
+
+  if (btn) { btn.disabled = false; btn.textContent = 'Send reply'; }
+  if (error) { toast('Failed to send reply: ' + error.message, 'error'); return; }
+
+  const item = allFeedback.find(f => f.id === id);
+  if (item) { item.admin_reply = reply; item.is_read = true; }
+  renderAdminFeedback();
+  toast('Reply sent!', 'success');
+}
+
+async function deleteReply(id) {
+  const { error } = await db.from('feedback').update({ admin_reply: null }).eq('id', id);
+  if (error) { toast('Failed to remove reply.', 'error'); return; }
+  const item = allFeedback.find(f => f.id === id);
+  if (item) item.admin_reply = null;
+  renderAdminFeedback();
+  toast('Reply removed.', 'success');
 }
 
 async function markFeedbackRead(id) {
@@ -1183,6 +1259,9 @@ window.submitFeedback = submitFeedback;
 window.markFeedbackRead = markFeedbackRead;
 window.deleteFeedback = deleteFeedback;
 window.filterAdminFeedback = filterAdminFeedback;
+window.toggleReplyForm = toggleReplyForm;
+window.submitReply = submitReply;
+window.deleteReply = deleteReply;
 
 boot();
 </script>
